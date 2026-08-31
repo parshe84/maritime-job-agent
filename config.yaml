@@ -1,0 +1,68 @@
+# =============================================================================
+# Maritime Job Agent — конфигурация фильтров и поведения
+# Меняйте этот файл, чтобы изменить критерии поиска — без правки кода.
+# =============================================================================
+
+filters:
+  # Должность. Ищем по вхождению слова (регистр не важен, границы слова
+  # учитываются, чтобы "Master" не совпадал с "Master's degree" и т.п.)
+  positions:
+    - captain
+    - master
+
+  # Слова/фразы, по которым определяем "Bulk Carrier Capesize и выше".
+  # Newcastlemax и VLOC/VLBC — это подклассы, которые тоже подходят,
+  # поэтому перечислены явно.
+  vessel_types:
+    - capesize
+    - newcastlemax
+    - vloc
+    - vlbc
+    - very large ore carrier
+    - very large bulk carrier
+    - post panamax bulk carrier   # некоторые объявления пишут размер так
+
+  # Если объявление указывает дедвейт (DWT) числом, но не называет класс
+  # судна словами выше — считаем, что судно подходит начиная с этого DWT.
+  # Capesize начинается примерно от 150 000 DWT.
+  dwt_min: 150000
+
+  # Минимальная зарплата в USD/мес.
+  min_salary_usd: 11000
+
+  # Как поступать с вакансиями, где зарплата вообще не указана на сайте,
+  # но остальные критерии (должность + тип судна) совпадают.
+  #   true  -> включать в письмо с пометкой "зарплата не указана — уточнить"
+  #   false -> строго исключать такие вакансии
+  include_unknown_salary: true
+
+  # Флаг судна / регион — пусто = без ограничений
+  flags: []
+
+  # Длительность контракта — пусто = без ограничений
+  contract_lengths: []
+
+network:
+  timeout_seconds: 25
+  user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+  # Пауза между запросами к разным сайтам (вежливость к серверам), в секундах
+  polite_delay_seconds: 1.5
+
+email:
+  subject_prefix: "Maritime Jobs Digest"
+  # Если получатель не задан через переменную окружения MAIL_TO,
+  # письмо уходит на тот же адрес, что указан в GMAIL_ADDRESS.
+
+sources:
+  # Список источников можно временно отключать (enabled: false) не удаляя
+  # сам файл-парсер — main.py просто пропустит выключенный источник.
+  martide: { enabled: true }
+  jobmarineman: { enabled: true }
+  crewell: { enabled: true }
+  maritime_zone: { enabled: true }
+  turtle: { enabled: true }
+  findseafarer: { enabled: true }
+  seacareer: { enabled: true }
+  berge_bulk: { enabled: true }
+  oldendorff: { enabled: true }
+  columbia_shipmanagement: { enabled: true }
