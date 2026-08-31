@@ -12,8 +12,15 @@ from .base import Vacancy, generic_html_job_scrape
 logger = logging.getLogger("maritime_job_agent")
 
 SOURCE = "findseafarer"
-LISTING_URL = "https://findseafarer.com/jobs"
-HREF_PATTERNS = ["/job", "/vacanc"]
+# Подтверждено прогоном через GitHub Actions 2026-08-31: /jobs -> 404.
+# Веб-поиск не дал точного пути к листингу вакансий (сайт мог не
+# индексировать этот раздел, либо список подгружается через JS/API).
+# Временно берём главную страницу — если после реального прогона источник
+# снова вернёт 0 без явной причины, откройте findseafarer.com в браузере,
+# найдите реальный путь до листинга (или JSON-эндпоинт в DevTools -> Network)
+# и обновите LISTING_URL/HREF_PATTERNS здесь.
+LISTING_URL = "https://findseafarer.com/"
+HREF_PATTERNS = ["/job", "/vacanc", "/position"]
 
 
 def fetch_vacancies(config: dict) -> list[Vacancy]:

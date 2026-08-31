@@ -12,7 +12,9 @@ from .base import Vacancy, generic_html_job_scrape
 logger = logging.getLogger("maritime_job_agent")
 
 SOURCE = "seacareer"
-LISTING_URL = "https://seacareer.com/vacancies"
+# Подтверждено прогоном через GitHub Actions 2026-08-31: /vacancies/ -> 404,
+# правильный путь - /jobs/sea-career/.
+LISTING_URL = "https://www.seacareer.com/jobs/sea-career/"
 HREF_PATTERNS = ["/vacanc", "/job"]
 
 

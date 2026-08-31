@@ -12,7 +12,9 @@ from .base import Vacancy, generic_html_job_scrape
 logger = logging.getLogger("maritime_job_agent")
 
 SOURCE = "turtle"
-LISTING_URL = "https://go-turtle.com/vacancy"
+# Подтверждено прогоном через GitHub Actions 2026-08-31: /vacancy -> 404,
+# правильный путь - /vacancies (множественное число), на www.go-turtle.com.
+LISTING_URL = "https://www.go-turtle.com/vacancies"
 HREF_PATTERNS = ["/vacanc", "/jobs/"]
 
 
