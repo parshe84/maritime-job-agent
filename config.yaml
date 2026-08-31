@@ -4,23 +4,32 @@
 # =============================================================================
 
 filters:
-  # Должность. Ищем по вхождению слова (регистр не важен, границы слова
-  # учитываются, чтобы "Master" не совпадал с "Master's degree" и т.п.)
+  # !!! ВРЕМЕННО ОСЛАБЛЕНО ДЛЯ ТЕСТА ДОСТАВКИ ПИСЬМА (2026-08-31) !!!
+  # Оригинальные значения (captain/master, capesize+, $11000) сохранены
+  # ниже в комментарии — вернуть после подтверждения, что письмо дошло.
+  # positions: [captain, master]
   positions:
-    - captain
+    - officer
     - master
+    - captain
+    - engineer
+    - rating
+    - seaman
+    - crew
+    - electrician
 
-  # Слова/фразы, по которым определяем "Bulk Carrier Capesize и выше".
-  # Newcastlemax и VLOC/VLBC — это подклассы, которые тоже подходят,
-  # поэтому перечислены явно.
+  # positions/vessel_types оригинал см. выше и ниже
+  # vessel_types: [capesize, newcastlemax, vloc, vlbc, very large ore carrier, very large bulk carrier, post panamax bulk carrier]
   vessel_types:
-    - capesize
-    - newcastlemax
-    - vloc
-    - vlbc
-    - very large ore carrier
-    - very large bulk carrier
-    - post panamax bulk carrier   # некоторые объявления пишут размер так
+    - carrier
+    - vessel
+    - ship
+    - tanker
+    - bulk
+    - container
+    - gas
+    - offshore
+    - cruise
 
   # Если объявление указывает дедвейт (DWT) числом, но не называет класс
   # судна словами выше — считаем, что судно подходит начиная с этого DWT.
@@ -28,7 +37,8 @@ filters:
   dwt_min: 150000
 
   # Минимальная зарплата в USD/мес.
-  min_salary_usd: 11000
+  # ВРЕМЕННО: 0 (оригинал: 11000) — вернуть после теста.
+  min_salary_usd: 0
 
   # Как поступать с вакансиями, где зарплата вообще не указана на сайте,
   # но остальные критерии (должность + тип судна) совпадают.
