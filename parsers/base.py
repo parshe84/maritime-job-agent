@@ -50,7 +50,10 @@ class Vacancy:
 DEFAULT_HEADERS_TEMPLATE = {
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
     "Accept-Language": "en-US,en;q=0.9",
-    "Accept-Encoding": "gzip, deflate, br",
+    # ВАЖНО: без "br" — стандартный requests не умеет распаковывать Brotli
+    # без дополнительного пакета (brotli/brotlicffi), иначе resp.text будет
+    # бинарной кашей и все селекторы молча перестанут находить ссылки.
+    "Accept-Encoding": "gzip, deflate",
     "Connection": "keep-alive",
     "Upgrade-Insecure-Requests": "1",
     "Sec-Fetch-Dest": "document",
