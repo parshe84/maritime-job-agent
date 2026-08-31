@@ -21,7 +21,7 @@ from pathlib import Path
 import yaml
 
 import parsers as parsers_pkg
-from parsers.base import Vacancy, matches_any, parse_salary_usd, polite_sleep, vessel_matches
+from parsers.base import Vacancy, evaluate_vessel, matches_any, parse_salary_usd, polite_sleep
 from mailer import send_digest, MailerConfigError
 
 ROOT_DIR = Path(__file__).resolve().parent
@@ -106,8 +106,10 @@ def matches_filters(vacancy: Vacancy, config: dict) -> bool:
     if not matches_any(haystack, filters.get("positions", [])):
         return False
 
-    if not vessel_matches(haystack, filters):
+    vessel_matched, vessel_class_unknown = evaluate_vessel(haystack, filters)
+    if not vessel_matched:
         return False
+    vacancy.vessel_class_unknown = vessel_class_unknown
 
     flags = filters.get("flags") or []
     if flags and not matches_any(haystack, flags):

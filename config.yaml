@@ -27,8 +27,19 @@ filters:
   # Capesize начинается примерно от 150 000 DWT.
   dwt_min: 150000
 
+  # Логика для вакансий, где явно написано просто "Bulk Carrier" / "Bulker" /
+  # "Ore Carrier" без указания класса (см. evaluate_vessel() в parsers/base.py):
+  #   - явное упоминание класса из vessel_types выше -> подходит
+  #   - "Bulk Carrier" + DWT указан и DWT >= dwt_min -> подходит
+  #   - "Bulk Carrier" + DWT указан и DWT <  dwt_min -> НЕ подходит (маленькое судно)
+  #   - "Bulk Carrier" + класс/DWT в карточке НЕ указаны вовсе -> подходит,
+  #     но письмо помечает такую строку "⚠️ класс судна не указан — проверьте вручную"
+  # Это осознанный компромисс: явное указание Capesize/Newcastlemax/VLOC в
+  # карточках источников встречается редко, а полностью отсеивать все
+  # "просто Bulk Carrier" вакансии означало бы упускать реально подходящие.
+
   # Минимальная зарплата в USD/мес.
-  min_salary_usd: 11000
+  min_salary_usd: 10600
 
   # Как поступать с вакансиями, где зарплата вообще не указана на сайте,
   # но остальные критерии (должность + тип судна) совпадают.
@@ -66,3 +77,4 @@ sources:
   berge_bulk: { enabled: true }
   oldendorff: { enabled: true }
   columbia_shipmanagement: { enabled: true }
+  ukrcrewing: { enabled: true }

@@ -37,6 +37,7 @@ class Vacancy:
     company: str = ""
     location: str = ""
     raw_text: str = ""          # весь текст карточки — на случай если regex что-то пропустил
+    vessel_class_unknown: bool = False  # True: "Bulk Carrier" без класса/DWT в карточке — проверить вручную
 
     @property
     def id(self) -> str:
@@ -163,17 +164,45 @@ def extract_dwt(text: str) -> int | None:
         return None
 
 
-def vessel_matches(text: str, filters: dict) -> bool:
-    """Проверка 'Bulk Carrier Capesize и выше' по названию класса ИЛИ по DWT."""
+GENERIC_BULK_CARRIER_KEYWORDS = ["bulk carrier", "bulker", "ore carrier"]
+
+
+def evaluate_vessel(text: str, filters: dict) -> tuple[bool, bool]:
+    """Проверка 'Bulk Carrier Capesize и выше'. Возвращает (matched, class_unknown).
+
+    Правила:
+    1. Явное упоминание класса (Capesize/Newcastlemax/VLOC/VLBC/...) из
+       filters.vessel_types -> подходит, класс известен.
+    2. Иначе, если в тексте есть просто "Bulk Carrier" / "Bulker" /
+       "Ore Carrier" (без уточнения класса):
+         a) указан DWT и он >= dwt_min -> подходит, класс известен (по DWT);
+         b) указан DWT и он < dwt_min -> НЕ подходит (слишком маленькое судно);
+         c) DWT в карточке вообще не указан -> подходит, но класс/DWT НЕИЗВЕСТНЫ
+            (class_unknown=True) — письмо должно это явно пометить, чтобы
+            получатель проверил вручную.
+    3. Иначе (не Bulk Carrier вовсе) -> не подходит.
+    """
     vessel_types = filters.get("vessel_types", [])
     if matches_any(text, vessel_types):
-        return True
-    dwt_min = filters.get("dwt_min")
-    if dwt_min:
+        return True, False
+
+    if matches_any(text, GENERIC_BULK_CARRIER_KEYWORDS):
+        dwt_min = filters.get("dwt_min")
         dwt = extract_dwt(text)
-        if dwt is not None and dwt >= dwt_min and matches_any(text, ["bulk carrier", "bulker", "ore carrier"]):
-            return True
-    return False
+        if dwt is not None:
+            if dwt_min and dwt >= dwt_min:
+                return True, False
+            return False, False
+        # DWT/класс не указаны вовсе — пропускаем с пометкой "проверить вручную"
+        return True, True
+
+    return False, False
+
+
+def vessel_matches(text: str, filters: dict) -> bool:
+    """Обратная совместимость: только да/нет, без пометки о неизвестном классе."""
+    matched, _ = evaluate_vessel(text, filters)
+    return matched
 
 
 def clean_text(text: str) -> str:
