@@ -9,6 +9,7 @@ filters:
   positions:
     - captain
     - master
+    - капитан*      # "*" = любое окончание: капитан, капитана, капитаны
 
   # Слова/фразы, по которым определяем "Bulk Carrier Capesize и выше".
   # Newcastlemax и VLOC/VLBC — это подклассы, которые тоже подходят,
@@ -38,8 +39,20 @@ filters:
   # карточках источников встречается редко, а полностью отсеивать все
   # "просто Bulk Carrier" вакансии означало бы упускать реально подходящие.
 
+  # Общие слова "это балкер/сухогруз" — к ним применяется правило DWT выше
+  # (DWT указан и < dwt_min -> отсеиваем; DWT не указан -> пометка ⚠️).
+  # "*" в конце = любое окончание (балкер, балкере, балкеры, сухогрузы...).
+  bulk_generic_keywords:
+    - bulk carrier
+    - bulker
+    - ore carrier
+    - bulk          # в Telegram пишут коротко: "Master on bulk"
+    - балкер*
+    - навалочник*
+    - сухогруз*
+
   # Минимальная зарплата в USD/мес.
-  min_salary_usd: 10600
+  min_salary_usd: 10500
 
   # Как поступать с вакансиями, где зарплата вообще не указана на сайте,
   # но остальные критерии (должность + тип судна) совпадают.
@@ -74,7 +87,9 @@ sources:
   martide: { enabled: true }
   jobmarineman: { enabled: true }
   crewell: { enabled: true }
-  maritime_zone: { enabled: true }
+  # Maritime-Zone с 2026-10 отдаёт 403 на ВСЁ, включая главную и страницу
+  # входа — ни браузер, ни логин не помогают. Включите обратно, если сайт откроется.
+  maritime_zone: { enabled: false }
   turtle: { enabled: true }
   findseafarer: { enabled: true }
   seacareer: { enabled: true }
@@ -82,3 +97,11 @@ sources:
   oldendorff: { enabled: true }
   columbia_shipmanagement: { enabled: true }
   ukrcrewing: { enabled: true }
+  maritime_union: { enabled: true }
+  seajobs: { enabled: true }
+  telegram_channels: { enabled: true }
+
+# Публичные Telegram-каналы (часть ссылки после t.me/). Читаются без аккаунта.
+telegram_channels:
+  - marinejobz      # MarineJobs, на англ., есть "Master on bulk"
+  - rekamore_su     # Rekamore, на русском, ~38 тыс. подписчиков

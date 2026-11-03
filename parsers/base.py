@@ -189,7 +189,11 @@ def matches_any(text: str, keywords: list[str]) -> bool:
         kw = kw.lower().strip()
         if not kw:
             continue
-        if " " in kw:
+        if kw.endswith("*"):
+            # "балкер*" — основа слова + любое окончание (балкер, балкере, балкеры)
+            if re.search(rf"\b{re.escape(kw[:-1])}\w*", lowered):
+                return True
+        elif " " in kw:
             if kw in lowered:
                 return True
         else:
@@ -202,7 +206,11 @@ def extract_dwt(text: str) -> int | None:
     """Пытается найти дедвейт судна в тексте, например '180,000 DWT' -> 180000."""
     if not text:
         return None
-    match = re.search(r"([\d][\d,\.\s]{3,10})\s*dwt", text, re.IGNORECASE)
+    # "180,000 DWT", "55 875 двт" — число перед единицей...
+    match = re.search(r"([\d][\d,\.\s]{3,10})\s*(?:dwt|двт|тдв)", text, re.IGNORECASE)
+    # ...или "DWT 55875", "DWT: 55 875" — после
+    if not match:
+        match = re.search(r"(?:dwt|двт|тдв)\s*[:\-]?\s*([\d][\d,\.\s]{3,10})", text, re.IGNORECASE)
     if not match:
         return None
     cleaned = match.group(1).replace(" ", "").replace(",", "")
@@ -212,6 +220,7 @@ def extract_dwt(text: str) -> int | None:
         return None
 
 
+# По умолчанию; переопределяется filters.bulk_generic_keywords в config.yaml
 GENERIC_BULK_CARRIER_KEYWORDS = ["bulk carrier", "bulker", "ore carrier"]
 
 
@@ -234,7 +243,7 @@ def evaluate_vessel(text: str, filters: dict) -> tuple[bool, bool]:
     if matches_any(text, vessel_types):
         return True, False
 
-    if matches_any(text, GENERIC_BULK_CARRIER_KEYWORDS):
+    if matches_any(text, filters.get("bulk_generic_keywords") or GENERIC_BULK_CARRIER_KEYWORDS):
         dwt_min = filters.get("dwt_min")
         dwt = extract_dwt(text)
         if dwt is not None:
@@ -367,7 +376,20 @@ def _scrape_one_page(
     config: dict,
     title_hint_words: list[str] | None,
 ) -> list[Vacancy]:
-    soup = BeautifulSoup(fetch_html(listing_url, config), "html.parser")
+    return parse_listing_html(
+        source, listing_url, fetch_html(listing_url, config), href_patterns, title_hint_words
+    )
+
+
+def parse_listing_html(
+    source: str,
+    listing_url: str,
+    html: str,
+    href_patterns: list[str],
+    title_hint_words: list[str] | None = None,
+) -> list[Vacancy]:
+    """Разбор уже загруженного HTML листинга (без сетевых запросов)."""
+    soup = BeautifulSoup(html, "html.parser")
     links = find_job_links(soup, href_patterns)
     job_hrefs = {a.get("href") for a in links}
 

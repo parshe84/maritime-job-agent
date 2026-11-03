@@ -46,6 +46,9 @@ jobs:
           GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           MAIL_TO: ${{ secrets.MAIL_TO }}
+          # Вход на портал моряка JobMarineMan (необязательно)
+          JMM_LOGIN: ${{ secrets.JMM_LOGIN }}
+          JMM_PASSWORD: ${{ secrets.JMM_PASSWORD }}
         run: python main.py
 
       - name: Commit updated seen_vacancies.json

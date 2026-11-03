@@ -15,6 +15,7 @@ from __future__ import annotations
 import logging
 import os
 import smtplib
+from html import escape
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
@@ -50,11 +51,11 @@ def build_digest_html(vacancies: list[Vacancy], config: dict) -> str:
 
     rows = []
     for v in vacancies:
-        salary_note = v.salary_raw or "не указана"
+        salary_note = escape(v.salary_raw) or "не указана"
         if v.salary_usd_month is None and filters.get("include_unknown_salary", True):
             salary_note = f"{salary_note} — [зарплата не указана, уточнить у работодателя]"
 
-        vessel_note = v.vessel_type[:200]
+        vessel_note = escape(v.vessel_type[:300])
         if v.vessel_class_unknown:
             vessel_note = (
                 f'<span style="color:#b45309;">⚠️ класс судна не указан в источнике — '
@@ -64,12 +65,12 @@ def build_digest_html(vacancies: list[Vacancy], config: dict) -> str:
         rows.append(
             f"""
             <tr>
-              <td style="padding:8px;border-bottom:1px solid #ddd;"><b>{v.title}</b><br>
-                  <span style="color:#666;font-size:12px;">{v.source}</span></td>
+              <td style="padding:8px;border-bottom:1px solid #ddd;"><b>{escape(v.title)}</b><br>
+                  <span style="color:#666;font-size:12px;">{escape(v.source)}</span></td>
               <td style="padding:8px;border-bottom:1px solid #ddd;">{vessel_note}</td>
               <td style="padding:8px;border-bottom:1px solid #ddd;">{salary_note}</td>
               <td style="padding:8px;border-bottom:1px solid #ddd;">
-                  <a href="{v.url}">Открыть вакансию</a></td>
+                  <a href="{escape(v.url, quote=True)}">Открыть вакансию</a></td>
             </tr>
             """
         )
