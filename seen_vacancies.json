@@ -1,12 +1,27 @@
 {
+  "0ff81f3d9ebdb29234ff0a9c": {
+    "source": "telegram:rekamore_su",
+    "title": "Старший помощник капитана",
+    "url": "https://t.me/rekamore_su/164056"
+  },
   "3405a7055632cfdcefaa9598": {
     "source": "ukrcrewing",
     "title": "Master",
     "url": "https://ukrcrewing.com.ua/en/vacancy/367600?v_sort=0&v_sort_dir=0"
   },
+  "3f5dc3ed803da22fe68a131d": {
+    "source": "telegram:marinejobz",
+    "title": "URGENTLY!!! We are looking for Master on bulk",
+    "url": "https://t.me/marinejobz/194138"
+  },
   "c2babd2fe579cf2d16077f62": {
     "source": "ukrcrewing",
     "title": "Master",
     "url": "https://ukrcrewing.com.ua/en/vacancy/367609?v_sort=0&v_sort_dir=0"
+  },
+  "cb48e51050e311426553c362": {
+    "source": "ukrcrewing",
+    "title": "Master",
+    "url": "https://ukrcrewing.com.ua/en/vacancy/367666?v_sort=0&v_sort_dir=0"
   }
 }
