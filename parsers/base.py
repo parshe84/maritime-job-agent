@@ -293,21 +293,32 @@ def find_job_links(soup: BeautifulSoup, href_patterns: list[str]) -> list[Tag]:
     return links
 
 
-def nearest_card(a_tag: Tag, max_up: int = 5) -> Tag:
-    """Поднимается от <a> вверх, пока текст контейнера не станет 'достаточным'
-    карточкой (не слишком коротким и не всей страницей целиком)."""
+def nearest_card(a_tag: Tag, job_hrefs: set[str] | None = None, max_up: int = 8) -> Tag:
+    """Карточка вакансии = НАИМЕНЬШИЙ контейнер вокруг ссылки, в котором ещё
+    нет ссылок на ДРУГИЕ вакансии.
+
+    Поднимаемся от <a> вверх, пока родитель содержит ссылку только на эту же
+    вакансию. Как только родитель захватывает вторую вакансию (строку таблицы
+    соседа, соседнюю карточку) — останавливаемся. Раньше брался самый большой
+    контейнер до 2000 символов, и на UkrCrewing им оказывалась вся таблица:
+    слово "Master" из одной строки приписывалось всем 30 вакансиям страницы.
+    """
+    own = a_tag.get("href")
     node = a_tag
-    best = a_tag
     for _ in range(max_up):
-        if node.parent is None:
+        parent = node.parent
+        if parent is None or parent.name in ("body", "html", "[document]"):
             break
-        node = node.parent
-        text_len = len(clean_text(node.get_text(" ")))
-        if 20 <= text_len <= 2000:
-            best = node
-        if text_len > 2000:
+        if job_hrefs is not None:
+            hrefs_inside = {
+                x.get("href") for x in parent.find_all("a", href=True) if x.get("href") in job_hrefs
+            }
+            if hrefs_inside - {own}:
+                break  # родитель уже содержит другую вакансию
+        if len(clean_text(parent.get_text(" "))) > 1500:
             break
-    return best
+        node = parent
+    return node
 
 
 def absolute_url(base_url: str, href: str) -> str:
@@ -358,6 +369,7 @@ def _scrape_one_page(
 ) -> list[Vacancy]:
     soup = BeautifulSoup(fetch_html(listing_url, config), "html.parser")
     links = find_job_links(soup, href_patterns)
+    job_hrefs = {a.get("href") for a in links}
 
     if not links:
         logger.warning(
@@ -370,7 +382,7 @@ def _scrape_one_page(
 
     vacancies: list[Vacancy] = []
     for a in links:
-        card = nearest_card(a)
+        card = nearest_card(a, job_hrefs)
         card_text = clean_text(card.get_text(" "))
         if len(card_text) < 15:
             continue
