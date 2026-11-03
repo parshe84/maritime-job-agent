@@ -143,11 +143,20 @@ def polite_sleep(config: dict) -> None:
 # Извлечение зарплаты из свободного текста
 # ---------------------------------------------------------------------------
 
+# Курс EUR->USD для объявлений в евро; переопределяется config.yaml
+# (filters.eur_to_usd) при старте main.py.
+EUR_TO_USD = 1.10
+
+# (шаблон, валюта)
 _SALARY_PATTERNS = [
     # "$11,500", "USD 11500", "US$ 11 500"
-    re.compile(r"(?:usd|us\$|\$)\s*([\d][\d,\.\s]{2,10})", re.IGNORECASE),
+    (re.compile(r"(?:usd|us\$|\$)\s*([\d][\d,\.\s]{2,10})", re.IGNORECASE), "USD"),
     # "11500 usd", "11,500 usd/month"
-    re.compile(r"([\d][\d,\.\s]{2,10})\s*(?:usd|us\$|\$)", re.IGNORECASE),
+    (re.compile(r"([\d][\d,\.\s]{2,10})\s*(?:usd|us\$|\$)", re.IGNORECASE), "USD"),
+    # "EUR 9000", "€9 000"
+    (re.compile(r"(?:eur|euro|€)\s*([\d][\d,\.\s]{2,10})", re.IGNORECASE), "EUR"),
+    # "9 000 EUR", "9000€", "9000 евро"
+    (re.compile(r"([\d][\d,\.\s]{2,10})\s*(?:eur|euro|€|евро)", re.IGNORECASE), "EUR"),
 ]
 
 
@@ -161,7 +170,7 @@ def parse_salary_usd(text: str) -> float | None:
     if not text:
         return None
     candidates: list[float] = []
-    for pattern in _SALARY_PATTERNS:
+    for pattern, currency in _SALARY_PATTERNS:
         for match in pattern.finditer(text):
             raw = match.group(1)
             cleaned = raw.strip().replace(" ", "").replace(",", "").rstrip(".")
@@ -176,7 +185,7 @@ def parse_salary_usd(text: str) -> float | None:
             # Явно мусорные значения (например, год "2024") отбрасываем —
             # зарплата капитана не бывает < 1000 или > 100000 в месяц.
             if 1000 <= value <= 100000:
-                candidates.append(value)
+                candidates.append(value * EUR_TO_USD if currency == "EUR" else value)
     if not candidates:
         return None
     return max(candidates)

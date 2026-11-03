@@ -171,6 +171,8 @@ def log_candidates(vacancies: list[Vacancy], config: dict) -> None:
 
 def main() -> int:
     config = load_config()
+    import parsers.base as _base
+    _base.EUR_TO_USD = float(config.get("filters", {}).get("eur_to_usd", _base.EUR_TO_USD))
     seen = load_seen()
 
     logger.info("=== Maritime Job Agent: старт сбора ===")
