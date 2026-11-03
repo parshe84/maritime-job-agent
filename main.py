@@ -131,6 +131,37 @@ def matches_filters(vacancy: Vacancy, config: dict) -> bool:
     return bool(filters.get("include_unknown_salary", True))
 
 
+def rejection_reason(vacancy: Vacancy, config: dict) -> str:
+    """Человекочитаемая причина, почему вакансия прошла/не прошла фильтр
+    (для логов — чтобы было видно реальные данные, а не только счётчик)."""
+    filters = config.get("filters", {})
+    haystack = " ".join([vacancy.title, vacancy.vessel_type, vacancy.raw_text])
+    vessel_ok, unknown = evaluate_vessel(haystack, filters)
+    if not vessel_ok:
+        return "НЕТ: судно не Bulk Carrier Capesize+ (или DWT < порога)"
+    salary = vacancy.salary_usd_month
+    if salary is None:
+        salary = parse_salary_usd(haystack)
+    if salary is not None and salary < filters.get("min_salary_usd", 0):
+        return f"НЕТ: зарплата {salary:.0f} < {filters.get('min_salary_usd')}"
+    return "ДА" + (" (класс судна не указан)" if unknown else "")
+
+
+def log_candidates(vacancies: list[Vacancy], config: dict) -> None:
+    """Логирует каждую вакансию капитана/мастера с причиной решения фильтра."""
+    positions = config.get("filters", {}).get("positions", [])
+    candidates = [
+        v for v in vacancies
+        if matches_any(" ".join([v.title, v.raw_text]), positions)
+    ]
+    logger.info("--- Кандидаты по должности (%d шт.) ---", len(candidates))
+    for v in candidates:
+        logger.info(
+            "  [%s] %s | %s | %s | текст: %s",
+            v.source, rejection_reason(v, config), v.title[:60], v.url, v.raw_text[:200],
+        )
+
+
 def main() -> int:
     config = load_config()
     seen = load_seen()
@@ -140,6 +171,7 @@ def main() -> int:
     logger.info("Всего собрано вакансий со всех источников: %d", len(all_vacancies))
 
     matched = [v for v in all_vacancies if matches_filters(v, config)]
+    log_candidates(all_vacancies, config)
     logger.info("Подходят под критерии фильтра: %d", len(matched))
 
     new_vacancies = [v for v in matched if v.id not in seen]

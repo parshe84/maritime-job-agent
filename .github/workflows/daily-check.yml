@@ -2,11 +2,15 @@ name: Daily Maritime Job Check
 
 on:
   schedule:
-    # 00:00 UTC = 08:00 Asia/Kuala_Lumpur (UTC+8)
-    - cron: "0 0 * * *"
+    # Каждый час в :17 (UTC). Нечётная минута — потому что запуски на :00
+    # GitHub часто задерживает на 3-5 часов из-за перегрузки (так и было:
+    # "00:00 UTC" реально стартовал в 04:00-05:00 UTC).
+    # Письмо уходит только если появились НОВЫЕ подходящие вакансии,
+    # поэтому частые запуски = вы узнаёте о вакансии в течение ~часа,
+    # а не раз в сутки.
+    - cron: "17 * * * *"
   workflow_dispatch:
-    # Позволяет запустить вручную (Actions -> Daily Maritime Job Check -> Run workflow)
-    # для тестирования парсеров без ожидания расписания.
+    # Ручной запуск: Actions -> Daily Maritime Job Check -> Run workflow
 
 permissions:
   contents: write
@@ -49,7 +53,26 @@ jobs:
           if ! git diff --quiet -- seen_vacancies.json; then
             git add seen_vacancies.json
             git commit -m "chore: update seen_vacancies.json [skip ci]"
-            git push
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
           else
             echo "seen_vacancies.json не изменился — коммитить нечего."
+          fi
+
+      - name: Keepalive (prevent GitHub auto-disabling the schedule)
+        # GitHub отключает scheduled-workflow, если в репозитории нет коммитов
+        # 60 дней (так и случилось 2026-10-31). Раз в ~40 дней тишины делаем
+        # пустой коммит, чтобы расписание никогда не выключалось само.
+        if: always()
+        run: |
+          last=$(git log -1 --format=%ct)
+          now=$(date +%s)
+          days=$(( (now - last) / 86400 ))
+          echo "Дней с последнего коммита: $days"
+          if [ "$days" -ge 40 ]; then
+            git config user.name "maritime-job-agent-bot"
+            git config user.email "actions@users.noreply.github.com"
+            git commit --allow-empty -m "chore: keepalive [skip ci]"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
           fi
