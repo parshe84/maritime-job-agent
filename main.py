@@ -23,6 +23,7 @@ import yaml
 import parsers as parsers_pkg
 from parsers.base import Vacancy, evaluate_vessel, matches_any, parse_salary_usd, polite_sleep, position_matches, posted_days_ago, is_capesize
 from mailer import send_digest, MailerConfigError
+from telegram_notify import send_telegram, telegram_configured
 
 ROOT_DIR = Path(__file__).resolve().parent
 CONFIG_PATH = ROOT_DIR / "config.yaml"
@@ -214,16 +215,32 @@ def main() -> int:
         )
         return 1
 
+    # Доставка: почта и Telegram независимо друг от друга. Вакансии помечаются
+    # отправленными, если дошли ХОТЯ БЫ по одному каналу; если не дошли никуда —
+    # не помечаем, чтобы они пришли при следующем запуске.
+    delivered = False
+    failed = False
     try:
         send_digest(new_vacancies, config)
+        delivered = True
     except MailerConfigError as exc:
-        logger.error("Не удалось отправить письмо: %s", exc)
-        # Секреты не настроены — НЕ помечаем вакансии как отправленные,
-        # чтобы при следующем запуске (после настройки секретов) они снова
-        # попали в дайджест, а не потерялись.
-        return 1
+        logger.warning("Почта не настроена: %s", exc)
     except Exception:
+        failed = True
         logger.exception("Не удалось отправить письмо по неожиданной причине.")
+
+    if telegram_configured():
+        try:
+            send_telegram(new_vacancies, config)
+            delivered = True
+        except Exception:
+            failed = True
+            logger.exception("Не удалось отправить вакансии в Telegram.")
+    else:
+        logger.info("Telegram не настроен (нет TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID) — пропускаю.")
+
+    if not delivered:
+        logger.error("Вакансии не доставлены ни одним каналом — повторю при следующем запуске.")
         return 1
 
     for v in new_vacancies:
@@ -235,7 +252,8 @@ def main() -> int:
     save_seen(seen)
     logger.info("seen_vacancies.json обновлён (%d записей всего).", len(seen))
 
-    return 0
+    # Один из каналов упал — пусть запуск будет красным в Actions, чтобы это заметить
+    return 1 if failed else 0
 
 
 if __name__ == "__main__":

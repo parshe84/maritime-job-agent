@@ -49,6 +49,9 @@ jobs:
           # Вход на портал моряка JobMarineMan (необязательно)
           JMM_LOGIN: ${{ secrets.JMM_LOGIN }}
           JMM_PASSWORD: ${{ secrets.JMM_PASSWORD }}
+          # Уведомления в Telegram через вашего бота (необязательно)
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python main.py
 
       - name: Commit updated seen_vacancies.json
