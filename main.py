@@ -197,6 +197,16 @@ def main() -> int:
     logger.info("Из них кейпсайзов: %d", sum(v.is_capesize for v in new_vacancies))
     logger.info("Из них новых (ещё не отправлялись ранее): %d", len(new_vacancies))
 
+    # Ручной режим: прислать в Telegram ВСЕ подходящие сейчас вакансии, включая
+    # уже отправленные ранее (seen_vacancies.json не меняется).
+    if "--resend-telegram" in sys.argv:
+        current = sorted(matched, key=lambda v: not v.is_capesize)
+        if not current:
+            logger.info("Подходящих вакансий сейчас нет — в Telegram отправлять нечего.")
+            return 0
+        send_telegram(current, config)
+        return 0
+
     if not new_vacancies:
         logger.info("Новых подходящих вакансий нет — письмо не отправляется. Тишина.")
         return 0

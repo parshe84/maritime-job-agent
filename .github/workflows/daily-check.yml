@@ -16,6 +16,10 @@ on:
         description: "Только отправить тестовое сообщение в Telegram (без поиска)"
         type: boolean
         default: false
+      resend_telegram:
+        description: "Прислать в Telegram все подходящие сейчас вакансии (включая уже отправленные)"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -65,7 +69,7 @@ jobs:
           # Уведомления в Telegram через вашего бота (необязательно)
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: python main.py
+        run: python main.py ${{ inputs.resend_telegram && '--resend-telegram' || '' }}
 
       - name: Commit updated seen_vacancies.json
         if: always()
