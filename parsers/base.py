@@ -42,7 +42,9 @@ class Vacancy:
     @property
     def id(self) -> str:
         """Стабильный уникальный ID для дедупликации (по ссылке)."""
-        key = self.url.strip().rstrip("/").lower()
+        # Query-строку отбрасываем: UkrCrewing, например, добавляет к ссылке
+        # ?v_sort=0&v_sort_dir=0 — это та же вакансия, не новая.
+        key = self.url.strip().split("?")[0].split("#")[0].rstrip("/").lower()
         if not key:
             key = f"{self.source}|{self.title}|{self.vessel_type}"
         return hashlib.sha256(key.encode("utf-8")).hexdigest()[:24]
@@ -83,6 +85,52 @@ def http_get(url: str, config: dict, **kwargs) -> requests.Response:
             if attempt == 0:
                 time.sleep(2)
     raise last_exc  # type: ignore[misc]
+
+
+BLOCKED_STATUSES = {403, 429, 503}
+
+
+def browser_get_html(url: str, config: dict) -> str:
+    """Загрузка страницы настоящим headless-браузером (Playwright/Chromium).
+
+    Нужна для сайтов, которые отдают 403 простому HTTP-клиенту (анти-бот
+    защита вроде Cloudflare), но пускают обычный браузер. Если Playwright не
+    установлен — бросает ImportError, и вызывающий код просто залогирует сбой.
+    """
+    from playwright.sync_api import sync_playwright  # импорт только по необходимости
+
+    net_cfg = config.get("network", {})
+    timeout_ms = int(net_cfg.get("timeout_seconds", 25) * 1000) * 2
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        try:
+            page = browser.new_page(
+                user_agent=net_cfg.get("user_agent", "Mozilla/5.0"),
+                locale="en-US",
+            )
+            resp = page.goto(url, wait_until="domcontentloaded", timeout=timeout_ms)
+            # Даём время на JS-челлендж анти-бота и подгрузку списка
+            page.wait_for_timeout(5000)
+            status = resp.status if resp else 0
+            html = page.content()
+        finally:
+            browser.close()
+    if status in BLOCKED_STATUSES and "vacanc" not in html.lower():
+        raise RuntimeError(f"Браузер тоже получил HTTP {status} для {url}")
+    return html
+
+
+def fetch_html(url: str, config: dict) -> str:
+    """HTML страницы: сначала быстрый requests, при блокировке (403/429/503) —
+    резервная попытка через headless-браузер."""
+    try:
+        return http_get(url, config).text
+    except requests.HTTPError as exc:
+        status = exc.response.status_code if exc.response is not None else None
+        if status not in BLOCKED_STATUSES:
+            raise
+        logger.info("HTTP %s для %s — пробую через headless-браузер", status, url)
+        return browser_get_html(url, config)
 
 
 def polite_sleep(config: dict) -> None:
@@ -230,7 +278,14 @@ def find_job_links(soup: BeautifulSoup, href_patterns: list[str]) -> list[Tag]:
     seen_hrefs = set()
     for a in soup.find_all("a", href=True):
         href = a["href"]
-        if any(p in href.lower() for p in href_patterns):
+        # Ссылки пагинации (/p2/, ?page=2, /page/2) — не вакансии
+        if re.search(r"(/p\d+/?$|[?&]page=\d+|/page/\d+)", href.lower()):
+            continue
+        # Паттерн "re:..." — регулярное выражение, иначе — подстрока
+        if any(
+            re.search(p[3:], href, re.IGNORECASE) if p.startswith("re:") else p in href.lower()
+            for p in href_patterns
+        ):
             if href in seen_hrefs:
                 continue
             seen_hrefs.add(href)
@@ -262,20 +317,46 @@ def absolute_url(base_url: str, href: str) -> str:
 
 def generic_html_job_scrape(
     source: str,
-    listing_url: str,
+    listing_url: str | list[str],
     href_patterns: list[str],
     config: dict,
     title_hint_words: list[str] | None = None,
 ) -> list[Vacancy]:
-    """Общий сценарий для сайтов без публичного API: скачать страницу листинга,
-    найти карточки вакансий по ссылкам, вернуть список Vacancy.
+    """Общий сценарий для сайтов без публичного API: скачать страницу(ы)
+    листинга, найти карточки вакансий по ссылкам, вернуть список Vacancy.
+
+    listing_url: один URL или список URL (несколько страниц пагинации /
+    отфильтрованные разделы). Сбой одной страницы не мешает остальным;
+    одинаковые вакансии с разных страниц склеиваются по ID.
 
     title_hint_words: если задано, берём как заголовок первую строку текста
     карточки, содержащую одно из этих слов (напр. ["master", "captain"]) —
     так надёжнее, чем просто текст ссылки, который часто это просто "Apply".
     """
-    resp = http_get(listing_url, config)
-    soup = BeautifulSoup(resp.text, "html.parser")
+    urls = [listing_url] if isinstance(listing_url, str) else list(listing_url)
+    result: dict[str, Vacancy] = {}
+    errors = 0
+    for page_url in urls:
+        try:
+            for v in _scrape_one_page(source, page_url, href_patterns, config, title_hint_words):
+                result.setdefault(v.id, v)
+        except Exception as exc:  # noqa: BLE001 — одна страница не должна валить источник
+            errors += 1
+            logger.warning("[%s] Страница %s не загрузилась: %s", source, page_url, exc)
+    if errors == len(urls):
+        # Все страницы упали — пусть это будет видно как ошибка источника
+        raise RuntimeError(f"[{source}] ни одна из {len(urls)} страниц листинга не загрузилась")
+    return list(result.values())
+
+
+def _scrape_one_page(
+    source: str,
+    listing_url: str,
+    href_patterns: list[str],
+    config: dict,
+    title_hint_words: list[str] | None,
+) -> list[Vacancy]:
+    soup = BeautifulSoup(fetch_html(listing_url, config), "html.parser")
     links = find_job_links(soup, href_patterns)
 
     if not links:

@@ -21,8 +21,15 @@ logger = logging.getLogger("maritime_job_agent")
 SOURCE = "maritime_zone"
 # Подтверждено прогоном через GitHub Actions 2026-08-31: /en/vacancies -> 404,
 # правильный путь - /en/vacancy (без "ies").
-LISTING_URL = "https://maritime-zone.com/en/vacancy"
-HREF_PATTERNS = ["/vacanc", "/jobs/"]
+# С 2026-10 сайт отдаёт 403 простому HTTP-клиенту — fetch_html() в base.py
+# автоматически повторяет запрос через headless-браузер.
+# /en/vacancy-job-deck-master — раздел вакансий Master.
+LISTING_URL = [
+    "https://maritime-zone.com/en/vacancy-job-deck-master",
+    "https://maritime-zone.com/en/vacancy",
+]
+# Только конкретные вакансии /en/vacancy/<id>, не ссылки-категории
+HREF_PATTERNS = [r"re:/vacancy/\d+"]
 
 
 def fetch_vacancies(config: dict) -> list[Vacancy]:

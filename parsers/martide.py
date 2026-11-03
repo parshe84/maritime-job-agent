@@ -21,8 +21,17 @@ from .base import Vacancy, generic_html_job_scrape
 logger = logging.getLogger("maritime_job_agent")
 
 SOURCE = "martide"
-LISTING_URL = "https://www.martide.com/en/jobs"
-HREF_PATTERNS = ["/en/jobs/", "/jobs/"]
+# Martide фильтрует путём (проверено 2026-11-03): /en/jobs/master — все
+# вакансии Master, /en/jobs/bulk-carriers/master — Master на балкерах.
+# Плюс две общие страницы как подстраховка.
+LISTING_URL = [
+    "https://www.martide.com/en/jobs/bulk-carriers/master",
+    "https://www.martide.com/en/jobs/master",
+    "https://www.martide.com/en/jobs",
+    "https://www.martide.com/en/jobs/page/2",
+]
+# Ссылка на конкретную вакансию всегда заканчивается числовым ID
+HREF_PATTERNS = [r"re:/en/jobs/[a-z0-9-]+-\d+/?$"]
 
 
 def fetch_vacancies(config: dict) -> list[Vacancy]:

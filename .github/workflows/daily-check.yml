@@ -35,7 +35,10 @@ jobs:
           python-version: "3.12"
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: |
+          pip install -r requirements.txt
+          # Headless-браузер — резерв для сайтов, блокирующих простой HTTP (403)
+          python -m playwright install --with-deps chromium
 
       - name: Run job agent
         id: run_agent

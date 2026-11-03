@@ -15,8 +15,10 @@ from .base import Vacancy, generic_html_job_scrape
 logger = logging.getLogger("maritime_job_agent")
 
 SOURCE = "ukrcrewing"
-LISTING_URL = "https://ukrcrewing.com.ua/en/vacancy"
-HREF_PATTERNS = ["/vacancy/", "/vacancies/", "/en/vacancy"]
+# Пагинация путём /en/vacancy/pN/ (проверено 2026-11-03: 1700+ вакансий,
+# 30 на странице, новые сверху). Берём 10 первых страниц = 300 самых свежих.
+LISTING_URL = [f"https://ukrcrewing.com.ua/en/vacancy/p{i}/" for i in range(1, 11)]
+HREF_PATTERNS = [r"re:/en/vacancy/\d+"]
 
 
 def fetch_vacancies(config: dict) -> list[Vacancy]:

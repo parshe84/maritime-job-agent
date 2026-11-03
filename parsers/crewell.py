@@ -12,8 +12,9 @@ from .base import Vacancy, generic_html_job_scrape
 logger = logging.getLogger("maritime_job_agent")
 
 SOURCE = "crewell"
-LISTING_URL = "https://crewell.net/en/vacancies/"
-HREF_PATTERNS = ["/vacancies/", "/vacancy/"]
+# Пагинация ?page=N (проверено 2026-11-03), 20 вакансий на странице.
+LISTING_URL = [f"https://crewell.net/en/vacancies/?page={i}" for i in range(1, 6)]
+HREF_PATTERNS = [r"re:/en/vacancies/\d+"]
 
 
 def fetch_vacancies(config: dict) -> list[Vacancy]:
