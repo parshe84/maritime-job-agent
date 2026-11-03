@@ -10,6 +10,7 @@ filters:
     - captain
     - master
     - капитан*      # "*" = любое окончание: капитан, капитана, капитаны
+    - mst           # сокращение Master в объявлениях ("MST for bulk carrier")
 
   # Фразы, которые НЕ означают должность капитана, хотя содержат это слово.
   # Вырезаются из текста перед проверкой должности.
@@ -71,6 +72,9 @@ filters:
   # письмо не отправляется (почти наверняка сломался парсер, а не рынок).
   max_new_per_run: 40
 
+  # Объявления старше стольких дней (если сайт пишет "Posted: N days ago") — пропускаются
+  max_age_days: 21
+
   # Флаг судна / регион — пусто = без ограничений
   flags: []
 
@@ -98,7 +102,8 @@ sources:
   # входа — ни браузер, ни логин не помогают. Включите обратно, если сайт откроется.
   maritime_zone: { enabled: false }
   turtle: { enabled: true }
-  findseafarer: { enabled: true }
+  # FindSeafarer: раздела со списком вакансий не найдено (2026-11-03)
+  findseafarer: { enabled: false }
   seacareer: { enabled: true }
   berge_bulk: { enabled: true }
   oldendorff: { enabled: true }
@@ -107,11 +112,22 @@ sources:
   maritime_union: { enabled: true }
   seajobs: { enabled: true }
   telegram_channels: { enabled: true }
+  maritime_bell: { enabled: true }
+  seajobs_pro: { enabled: true }
+  osm_thome: { enabled: true }
+  proseafarers: { enabled: true }
+  sea_man_org: { enabled: true }
 
 # Посты старше стольких дней пропускаются (вакансия, скорее всего, закрыта)
 telegram_max_age_days: 10
 
 # Публичные Telegram-каналы (часть ссылки после t.me/). Читаются без аккаунта.
 telegram_channels:
-  - marinejobz      # MarineJobs, на англ., есть "Master on bulk"
-  - rekamore_su     # Rekamore, на русском, ~38 тыс. подписчиков
+  - marinejobz      # MarineJobs, англ.
+  - rekamore_su     # Rekamore, рус., ~38 тыс.
+  - marinejobs      # MARINE JOBS, англ., ~30 тыс., ~30 постов/день
+  - crewingua       # Crewing - Работа для моряков, ~17 тыс.
+  - pervoemorskoe   # Первое Морское Агентство, рус., балкеры/сухогрузы
+  - crewworks       # CREW WORK, рус.
+  - jobs_seafarers  # YCrewing, англ.
+  - seaman_jobs     # Seafarers Employment News, англ. (Индия)

@@ -25,6 +25,23 @@ logger = logging.getLogger("maritime_job_agent")
 SOURCE = "telegram"
 PAGES_PER_CHANNEL = 2  # ~20 постов на странице; запуск каждый час — с запасом
 
+# Строка похожа на "должность [- на] судно" — для распознавания постов-сборников
+RANK_LINE_RE = re.compile(
+    r"\b(master|captain|mst|chief\s+off\w*|c/o|chief\s+eng\w*|c/e|2nd|3rd|2/o|3/o|2/e|3/e|"
+    r"second|third|bosun|ab|oiler|fitter|cook|eto|electrician|motorman|wiper|"
+    r"капитан\w*|старпом\w*|помощник\w*|механик\w*|боцман\w*|матрос\w*|моторист\w*|"
+    r"повар\w*|электромеханик\w*)\b",
+    re.IGNORECASE,
+)
+VESSEL_WORD_RE = re.compile(
+    r"\b(tanker|bulk\w*|container\w*|lng|lpg|cargo|ro-?ro|psv|ahts|vessel|ship|carrier|"
+    r"reefer|mpp|coaster|tug|dredger|танкер\w*|балкер\w*|сухогруз\w*|контейнеровоз\w*|"
+    r"судн\w*|газовоз\w*|рефрижератор\w*|буксир\w*)\b",
+    re.IGNORECASE,
+)
+MASTER_RE = re.compile(r"\b(master|captain|mst|капитан\w*)\b", re.IGNORECASE)
+ASSISTANT_RE = re.compile(r"\bпомощник\w*\s+капитан\w*|\bstaff\s+captain\b", re.IGNORECASE)
+
 
 def _parse_page(channel: str, html: str, max_age_days: int = 10) -> tuple[list[Vacancy], int | None]:
     soup = BeautifulSoup(html, "html.parser")
@@ -43,6 +60,17 @@ def _parse_page(channel: str, html: str, max_age_days: int = 10) -> tuple[list[V
         if len(text) < 15:
             continue
         lines = [clean_text(x) for x in text_div.get_text("\n").split("\n") if clean_text(x)]
+        # Пост-сборник ("Master - tanker / C/O - bulk / 2/E - container ..."):
+        # проверяем только строки с капитаном, иначе "Master" из одной строки
+        # и "bulk" из другой дали бы ложное совпадение.
+        if sum(1 for ln in lines if RANK_LINE_RE.search(ln) and VESSEL_WORD_RE.search(ln)) >= 3:
+            master_lines = [
+                ln for ln in lines
+                if MASTER_RE.search(ln) and not ASSISTANT_RE.search(ln)
+            ]
+            if not master_lines:
+                continue
+            text = " | ".join(master_lines)
         # Заголовок — строка с должностью капитана, иначе первая строка поста
         first_line = next(
             (ln for ln in lines if matches_any(ln, ["master", "captain", "капитан*"])),

@@ -353,6 +353,31 @@ def nearest_card(a_tag: Tag, job_hrefs: set[str] | None = None, max_up: int = 8)
     return node
 
 
+def url_slug_words(url: str) -> str:
+    """'https://x.com/jobs/abc-bulk-carriers-master-123/' -> 'jobs abc bulk carriers master 123'"""
+    from urllib.parse import urlparse
+    path = urlparse(url).path
+    return re.sub(r"[-_/]+", " ", path).strip()
+
+
+def posted_days_ago(text: str) -> int | None:
+    """Возраст объявления, если в тексте есть 'Posted: 170 days ago' /
+    '3 дня назад' / 'today'. None — если возраст не указан."""
+    t = (text or "").lower()
+    if re.search(r"\b(today|yesterday|сегодня|вчера|hours? ago|час\w* назад)\b", t):
+        return 0
+    m = re.search(r"(\d+)\s*(day|days|дн\w*|день)\s*(ago|назад)", t)
+    if m:
+        return int(m.group(1))
+    m = re.search(r"(\d+)\s*(week|weeks|недел\w*)\s*(ago|назад)", t)
+    if m:
+        return int(m.group(1)) * 7
+    m = re.search(r"(\d+)\s*(month|months|месяц\w*)\s*(ago|назад)", t)
+    if m:
+        return int(m.group(1)) * 30
+    return None
+
+
 def absolute_url(base_url: str, href: str) -> str:
     from urllib.parse import urljoin
     return urljoin(base_url, href)
@@ -456,7 +481,10 @@ def parse_listing_html(
                 salary_raw=clean_text(salary_match.group(1)) if salary_match else "",
                 salary_usd_month=salary,
                 raw_text=card_text,
-                vessel_type=card_text,  # оставляем полный текст — vessel_matches() сам найдёт ключевые слова
+                # Полный текст карточки + слова из адреса ссылки: у Martide и
+                # Maritime Bell тип судна часто есть только в URL
+                # (".../bulk-carriers-master-1778...").
+                vessel_type=card_text + " " + url_slug_words(url),
             )
         )
 

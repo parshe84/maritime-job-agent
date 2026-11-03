@@ -21,7 +21,7 @@ from pathlib import Path
 import yaml
 
 import parsers as parsers_pkg
-from parsers.base import Vacancy, evaluate_vessel, matches_any, parse_salary_usd, polite_sleep, position_matches
+from parsers.base import Vacancy, evaluate_vessel, matches_any, parse_salary_usd, polite_sleep, position_matches, posted_days_ago
 from mailer import send_digest, MailerConfigError
 
 ROOT_DIR = Path(__file__).resolve().parent
@@ -106,6 +106,10 @@ def matches_filters(vacancy: Vacancy, config: dict) -> bool:
     if not position_matches(haystack, filters):
         return False
 
+    age = posted_days_ago(vacancy.raw_text)
+    if age is not None and age > filters.get("max_age_days", 21):
+        return False  # старое объявление, вакансия скорее всего закрыта
+
     vessel_matched, vessel_class_unknown = evaluate_vessel(haystack, filters)
     if not vessel_matched:
         return False
@@ -136,6 +140,9 @@ def rejection_reason(vacancy: Vacancy, config: dict) -> str:
     (для логов — чтобы было видно реальные данные, а не только счётчик)."""
     filters = config.get("filters", {})
     haystack = " ".join([vacancy.title, vacancy.vessel_type, vacancy.raw_text])
+    age = posted_days_ago(vacancy.raw_text)
+    if age is not None and age > filters.get("max_age_days", 21):
+        return f"НЕТ: объявлению {age} дн."
     vessel_ok, unknown = evaluate_vessel(haystack, filters)
     if not vessel_ok:
         return "НЕТ: судно не Bulk Carrier Capesize+ (или DWT < порога)"

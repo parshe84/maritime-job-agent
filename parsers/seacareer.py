@@ -1,7 +1,9 @@
 """
 Источник: SeaCareer — https://seacareer.com
 
-Статус проверки: НЕ подтверждено вживую (см. README, "Диагностика парсера").
+Проверено 2026-11-03: разделы /master-sdpo-jobs/ и /deck-officer-jobs/
+отдаются сервером, пагинация /N/, ссылка на вакансию /i<id>/<slug>/,
+тип судна — после даты ("October 27, 2026 - PSV").
 """
 from __future__ import annotations
 
@@ -12,10 +14,14 @@ from .base import Vacancy, generic_html_job_scrape
 logger = logging.getLogger("maritime_job_agent")
 
 SOURCE = "seacareer"
-# Подтверждено прогоном через GitHub Actions 2026-08-31: /vacancies/ -> 404,
-# правильный путь - /jobs/sea-career/.
-LISTING_URL = "https://www.seacareer.com/jobs/sea-career/"
-HREF_PATTERNS = ["/vacanc", "/job"]
+LISTING_URL = [
+    "https://www.seacareer.com/master-sdpo-jobs/",
+    "https://www.seacareer.com/master-sdpo-jobs/2/",
+    "https://www.seacareer.com/master-sdpo-jobs/3/",
+    "https://www.seacareer.com/deck-officer-jobs/",
+    "https://www.seacareer.com/deck-officer-jobs/2/",
+]
+HREF_PATTERNS = [r"re:/i\d+/"]
 
 
 def fetch_vacancies(config: dict) -> list[Vacancy]:
