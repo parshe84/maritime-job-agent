@@ -38,6 +38,7 @@ class Vacancy:
     location: str = ""
     raw_text: str = ""          # весь текст карточки — на случай если regex что-то пропустил
     vessel_class_unknown: bool = False  # True: "Bulk Carrier" без класса/DWT в карточке — проверить вручную
+    is_capesize: bool = False  # True: кейпсайз (DWT >= 170k / GT >= 80k / явно назван) — приоритет
 
     @property
     def id(self) -> str:
@@ -237,10 +238,10 @@ def extract_dwt(text: str) -> int | None:
     if not text:
         return None
     # "180,000 DWT", "55 875 двт" — число перед единицей...
-    match = re.search(r"([\d][\d,\.\s]{3,10})\s*(?:dwt|двт|тдв)", text, re.IGNORECASE)
+    match = re.search(NUM + r"\s*(?:dwt|двт|тдв)", text, re.IGNORECASE)
     # ...или "DWT 55875", "DWT: 55 875" — после
     if not match:
-        match = re.search(r"(?:dwt|двт|тдв)\s*[:\-–—=]?\s*([\d][\d,\.\s]{3,10})", text, re.IGNORECASE)
+        match = re.search(r"(?:dwt|двт|тдв)\s*[:\-–—=]?\s*" + NUM, text, re.IGNORECASE)
     if not match:
         return None
     cleaned = match.group(1).strip().replace(" ", "").replace(",", "").rstrip(".")
@@ -250,6 +251,58 @@ def extract_dwt(text: str) -> int | None:
         return int(float(cleaned))
     except ValueError:
         return None
+
+
+# Число вида "180,000" / "85 000" / "55.875" / "170000" (группы по 3 цифры),
+# чтобы "GT 85 000, 8000 $" не склеивалось в 850008000.
+NUM = r"(\d{1,3}(?:[ ,.\u00a0]\d{3}(?!\d))+|\d{4,7}(?!\d))"
+
+
+def _to_int(num: str) -> int | None:
+    cleaned = num.strip().replace(" ", "").replace(",", "").rstrip(".")
+    if re.fullmatch(r"\d{1,3}(\.\d{3})+", cleaned):
+        cleaned = cleaned.replace(".", "")
+    try:
+        return int(float(cleaned))
+    except ValueError:
+        return None
+
+
+_GT_UNITS = r"(?:grt|gt|gross\s+tonnage|gross\s+tons?|брт|валов\w*\s+вместимост\w*)"
+
+
+def extract_grt(text: str) -> int | None:
+    """Валовая вместимость (GT/GRT/БРТ): '90,000 GT', 'GRT: 85 000', 'БРТ 81000'."""
+    if not text:
+        return None
+    m = re.search(NUM + r"\s*" + _GT_UNITS + r"\b", text, re.IGNORECASE)
+    if not m:
+        m = re.search(r"\b" + _GT_UNITS + r"\s*[:\-–—=]?\s*" + NUM, text, re.IGNORECASE)
+    if not m:
+        return None
+    value = _to_int(m.group(1))
+    # Отсекаем мусор (год постройки, телефон): GT реальных судов 500..400 000
+    return value if value and 500 <= value <= 400000 else None
+
+
+DEFAULT_CAPESIZE_KEYWORDS = [
+    "capesize", "cape size", "newcastlemax", "vloc", "vlbc", "valemax", "chinamax",
+    "very large ore carrier", "very large bulk carrier", "кейпсайз*", "кэйпсайз*",
+]
+
+
+def is_capesize(text: str, filters: dict) -> bool:
+    """Кейпсайз (приоритет №1): класс назван явно, ИЛИ это балкер/рудовоз и
+    DWT >= capesize_dwt_min (170 000) или GT >= capesize_gt_min (80 000)."""
+    if matches_any(text, filters.get("capesize_keywords") or DEFAULT_CAPESIZE_KEYWORDS):
+        return True
+    if not matches_any(text, filters.get("bulk_generic_keywords") or GENERIC_BULK_CARRIER_KEYWORDS):
+        return False  # VLCC-танкер на 300 000 DWT — не кейпсайз
+    dwt, gt = extract_dwt(text), extract_grt(text)
+    return bool(
+        (dwt is not None and dwt >= filters.get("capesize_dwt_min", 170000))
+        or (gt is not None and gt >= filters.get("capesize_gt_min", 80000))
+    )
 
 
 # По умолчанию; переопределяется filters.bulk_generic_keywords в config.yaml
@@ -272,7 +325,7 @@ def evaluate_vessel(text: str, filters: dict) -> tuple[bool, bool]:
     3. Иначе (не Bulk Carrier вовсе) -> не подходит.
     """
     vessel_types = filters.get("vessel_types", [])
-    if matches_any(text, vessel_types):
+    if matches_any(text, vessel_types) or is_capesize(text, filters):
         return True, False
 
     if matches_any(text, filters.get("bulk_generic_keywords") or GENERIC_BULK_CARRIER_KEYWORDS):
@@ -282,7 +335,11 @@ def evaluate_vessel(text: str, filters: dict) -> tuple[bool, bool]:
             if dwt_min and dwt >= dwt_min:
                 return True, False
             return False, False
-        # DWT/класс не указаны вовсе — пропускаем с пометкой "проверить вручную"
+        # DWT нет, но есть GT меньше кейпсайзного порога — судно известно и мало
+        gt = extract_grt(text)
+        if gt is not None:
+            return False, False
+        # Ни DWT, ни GT, ни класса — пропускаем с пометкой "проверить вручную"
         return True, True
 
     return False, False

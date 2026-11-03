@@ -21,7 +21,7 @@ from pathlib import Path
 import yaml
 
 import parsers as parsers_pkg
-from parsers.base import Vacancy, evaluate_vessel, matches_any, parse_salary_usd, polite_sleep, position_matches, posted_days_ago
+from parsers.base import Vacancy, evaluate_vessel, matches_any, parse_salary_usd, polite_sleep, position_matches, posted_days_ago, is_capesize
 from mailer import send_digest, MailerConfigError
 
 ROOT_DIR = Path(__file__).resolve().parent
@@ -114,6 +114,7 @@ def matches_filters(vacancy: Vacancy, config: dict) -> bool:
     if not vessel_matched:
         return False
     vacancy.vessel_class_unknown = vessel_class_unknown
+    vacancy.is_capesize = is_capesize(haystack, filters)
 
     flags = filters.get("flags") or []
     if flags and not matches_any(haystack, flags):
@@ -127,6 +128,10 @@ def matches_filters(vacancy: Vacancy, config: dict) -> bool:
     if salary is None:
         salary = parse_salary_usd(haystack)
         vacancy.salary_usd_month = salary
+
+    # Кейпсайз — приоритет: по зарплате не фильтруем
+    if vacancy.is_capesize and filters.get("capesize_ignore_salary", True):
+        return True
 
     min_salary = filters.get("min_salary_usd", 0)
     if salary is not None:
@@ -145,7 +150,9 @@ def rejection_reason(vacancy: Vacancy, config: dict) -> str:
         return f"НЕТ: объявлению {age} дн."
     vessel_ok, unknown = evaluate_vessel(haystack, filters)
     if not vessel_ok:
-        return "НЕТ: судно не Bulk Carrier Capesize+ (или DWT < порога)"
+        return "НЕТ: судно не балкер подходящего размера (или DWT/GT < порога)"
+    if is_capesize(haystack, filters) and filters.get("capesize_ignore_salary", True):
+        return "ДА: КЕЙПСАЙЗ"
     salary = vacancy.salary_usd_month
     if salary is None:
         salary = parse_salary_usd(haystack)
@@ -184,6 +191,9 @@ def main() -> int:
     logger.info("Подходят под критерии фильтра: %d", len(matched))
 
     new_vacancies = [v for v in matched if v.id not in seen]
+    # Кейпсайзы — первыми (в письме и в логе)
+    new_vacancies.sort(key=lambda v: not v.is_capesize)
+    logger.info("Из них кейпсайзов: %d", sum(v.is_capesize for v in new_vacancies))
     logger.info("Из них новых (ещё не отправлялись ранее): %d", len(new_vacancies))
 
     if not new_vacancies:

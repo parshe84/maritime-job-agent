@@ -59,6 +59,26 @@ filters:
     - навалочник*
     - сухогруз*
 
+  # --- ПРИОРИТЕТ №1: КЕЙПСАЙЗ ---
+  # Балкер/рудовоз считается кейпсайзом, если класс назван явно (слова ниже)
+  # ИЛИ DWT >= capesize_dwt_min ИЛИ GT (ГРТ/БРТ) >= capesize_gt_min.
+  # Кейпсайзы идут в письме первым блоком, в теме пометка "🟢 КЕЙПСАЙЗ".
+  capesize_dwt_min: 170000
+  capesize_gt_min: 80000
+  capesize_ignore_salary: true   # для кейпсайзов фильтр по зарплате не применяется
+  capesize_keywords:
+    - capesize
+    - cape size
+    - newcastlemax
+    - vloc
+    - vlbc
+    - valemax
+    - chinamax
+    - very large ore carrier
+    - very large bulk carrier
+    - кейпсайз*
+    - кэйпсайз*
+
   # Минимальная зарплата в USD/мес.
   min_salary_usd: 10500
 

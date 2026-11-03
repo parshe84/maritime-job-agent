@@ -45,41 +45,34 @@ def _get_credentials() -> tuple[str, str, str]:
     return gmail_address, gmail_password, mail_to  # type: ignore[return-value]
 
 
-def build_digest_html(vacancies: list[Vacancy], config: dict) -> str:
-    filters = config.get("filters", {})
-    min_salary = filters.get("min_salary_usd")
+def _row(v: Vacancy, filters: dict) -> str:
+    salary_note = escape(v.salary_raw) or "не указана"
+    if v.salary_usd_month is None and filters.get("include_unknown_salary", True):
+        salary_note = f"{salary_note} — [зарплата не указана, уточнить у работодателя]"
 
-    rows = []
-    for v in vacancies:
-        salary_note = escape(v.salary_raw) or "не указана"
-        if v.salary_usd_month is None and filters.get("include_unknown_salary", True):
-            salary_note = f"{salary_note} — [зарплата не указана, уточнить у работодателя]"
-
-        vessel_note = escape(v.vessel_type[:300])
-        if v.vessel_class_unknown:
-            vessel_note = (
-                f'<span style="color:#b45309;">⚠️ класс судна не указан в источнике — '
-                f'проверьте вручную</span><br>{vessel_note}'
-            )
-
-        rows.append(
-            f"""
-            <tr>
-              <td style="padding:8px;border-bottom:1px solid #ddd;"><b>{escape(v.title)}</b><br>
-                  <span style="color:#666;font-size:12px;">{escape(v.source)}</span></td>
-              <td style="padding:8px;border-bottom:1px solid #ddd;">{vessel_note}</td>
-              <td style="padding:8px;border-bottom:1px solid #ddd;">{salary_note}</td>
-              <td style="padding:8px;border-bottom:1px solid #ddd;">
-                  <a href="{escape(v.url, quote=True)}">Открыть вакансию</a></td>
-            </tr>
-            """
+    vessel_note = escape(v.vessel_type[:300])
+    if v.vessel_class_unknown:
+        vessel_note = (
+            f'<span style="color:#b45309;">⚠️ класс судна не указан в источнике — '
+            f'проверьте вручную</span><br>{vessel_note}'
         )
-
     return f"""
-    <html>
-    <body style="font-family:Arial,sans-serif;">
-      <h2>Новые вакансии Captain/Master — Bulk Carrier Capesize+ (от ${min_salary}/мес)</h2>
-      <p>Найдено новых подходящих вакансий: <b>{len(vacancies)}</b></p>
+        <tr>
+          <td style="padding:8px;border-bottom:1px solid #ddd;"><b>{escape(v.title)}</b><br>
+              <span style="color:#666;font-size:12px;">{escape(v.source)}</span></td>
+          <td style="padding:8px;border-bottom:1px solid #ddd;">{vessel_note}</td>
+          <td style="padding:8px;border-bottom:1px solid #ddd;">{salary_note}</td>
+          <td style="padding:8px;border-bottom:1px solid #ddd;">
+              <a href="{escape(v.url, quote=True)}">Открыть вакансию</a></td>
+        </tr>
+        """
+
+
+def _table(title: str, color: str, vacancies: list[Vacancy], filters: dict) -> str:
+    if not vacancies:
+        return ""
+    return f"""
+      <h3 style="color:{color};margin-top:24px;">{title} — {len(vacancies)}</h3>
       <table style="border-collapse:collapse;width:100%;">
         <thead>
           <tr style="background:#f0f0f0;text-align:left;">
@@ -89,10 +82,25 @@ def build_digest_html(vacancies: list[Vacancy], config: dict) -> str:
             <th style="padding:8px;">Ссылка</th>
           </tr>
         </thead>
-        <tbody>
-          {"".join(rows)}
-        </tbody>
-      </table>
+        <tbody>{"".join(_row(v, filters) for v in vacancies)}</tbody>
+      </table>"""
+
+
+def build_digest_html(vacancies: list[Vacancy], config: dict) -> str:
+    filters = config.get("filters", {})
+    cape = [v for v in vacancies if v.is_capesize]
+    other = [v for v in vacancies if not v.is_capesize]
+    return f"""
+    <html>
+    <body style="font-family:Arial,sans-serif;">
+      <h2>Новые вакансии Captain/Master — Bulk Carrier</h2>
+      <p>Найдено новых подходящих вакансий: <b>{len(vacancies)}</b></p>
+      {_table(
+          f"🟢 КЕЙПСАЙЗ (DWT ≥ {filters.get('capesize_dwt_min', 170000):,} или GT ≥ "
+          f"{filters.get('capesize_gt_min', 80000):,}) — без фильтра по зарплате".replace(",", " "),
+          "#047857", cape, filters)}
+      {_table(f"Остальные балкеры (зарплата от ${filters.get('min_salary_usd')}/мес или не указана)",
+              "#374151", other, filters)}
     </body>
     </html>
     """
@@ -108,7 +116,10 @@ def send_digest(vacancies: list[Vacancy], config: dict) -> None:
     gmail_address, gmail_password, mail_to = _get_credentials()
 
     subject_prefix = config.get("email", {}).get("subject_prefix", "Maritime Jobs Digest")
+    cape = sum(1 for v in vacancies if v.is_capesize)
     subject = f"{subject_prefix}: {len(vacancies)} новых вакансий"
+    if cape:
+        subject = f"🟢 КЕЙПСАЙЗ ({cape}) — {subject}"
 
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
