@@ -11,6 +11,11 @@ on:
     - cron: "17 * * * *"
   workflow_dispatch:
     # Ручной запуск: Actions -> Daily Maritime Job Check -> Run workflow
+    inputs:
+      test_telegram:
+        description: "Только отправить тестовое сообщение в Telegram (без поиска)"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -40,7 +45,15 @@ jobs:
           # Headless-браузер — резерв для сайтов, блокирующих простой HTTP (403)
           python -m playwright install --with-deps chromium
 
+      - name: Telegram test message
+        if: ${{ inputs.test_telegram }}
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python telegram_notify.py
+
       - name: Run job agent
+        if: ${{ !inputs.test_telegram }}
         id: run_agent
         env:
           GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}

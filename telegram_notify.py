@@ -88,3 +88,25 @@ def send_telegram(vacancies: list[Vacancy], config: dict) -> None:
             # Токен в лог не попадает: печатаем только ответ Telegram
             raise RuntimeError(f"Telegram ответил {resp.status_code}: {resp.text[:300]}")
     logger.info("Telegram: отправлено %d вакансий.", len(vacancies))
+
+
+def send_test_message() -> None:
+    """Пробное сообщение — проверка, что секреты Telegram заданы верно."""
+    if not telegram_configured():
+        raise SystemExit("TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID не заданы в GitHub Secrets")
+    resp = requests.post(
+        API.format(token=os.environ["TELEGRAM_BOT_TOKEN"]),
+        json={
+            "chat_id": os.environ["TELEGRAM_CHAT_ID"],
+            "text": "🔔 Тест из GitHub Actions: секреты Telegram настроены, вакансии будут приходить сюда.",
+        },
+        timeout=30,
+    )
+    if resp.status_code != 200:
+        raise SystemExit(f"Telegram ответил {resp.status_code}: {resp.text[:300]}")
+    logger.info("Telegram: тестовое сообщение отправлено.")
+
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+    send_test_message()
