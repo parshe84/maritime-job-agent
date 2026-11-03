@@ -16,26 +16,29 @@ DWT меньше 150 000 (т.е. либо DWT ≥ 150 000, либо DWT/клас
 указан и меньше 150 000, по-прежнему отсеивается. Подробности — в
 `evaluate_vessel()` (`parsers/base.py`) и комментариях в `config.yaml`.
 
-## Статус источников (реальный прогон 2026-11-03, коммит `f363d2b`)
+## Статус источников (реальный прогон 2026-11-03, ~1040 вакансий за запуск)
 
 Запуск каждый час (`17 * * * *`). Цифры — вакансий/постов за один прогон до фильтра.
 
-| Источник | Статус | За прогон | Комментарий |
-|---|:-:|:-:|---|
-| UkrCrewing | ✅ | 302 | 10 страниц `/en/vacancy/pN/` |
-| Maritime Union | ✅ | 150 | `maritime-union.com/jobs?p=N` |
-| Martide | ✅ | 90 | разделы `/jobs/master`, `/jobs/bulk-carriers/master` |
-| Crewell | ✅ | 60 | `?page=1..5` |
-| SeaJobs.ru | ✅ | 50 | `/ru/vacancies?page=N` |
-| Telegram | ✅ | ~50 | каналы из `telegram_channels` в config.yaml, посты не старше 10 дней |
-| Berge Bulk, Oldendorff, TURTLE, Columbia | ✅ | 1–6 | карьерные страницы компаний |
-| JobMarineMan | ⚠️ | 0 | 403 анти-бот; включается вход на портал моряка, если заданы Secrets `JMM_LOGIN`/`JMM_PASSWORD` |
-| SeaCareer, FindSeafarer | ⚠️ | 0 | ссылки на вакансии не находятся |
-| Maritime-Zone | 🛑 выкл. | — | 403 на всё, включая страницу входа |
+| Источник | За прогон | Комментарий |
+|---|:-:|---|
+| UkrCrewing | 302 | 10 страниц `/en/vacancy/pN/` |
+| Telegram (7 каналов) | ~180 | `telegram_channels` в config.yaml; посты не старше 10 дней; в постах-сборниках проверяются только строки с капитаном |
+| Maritime Union | 150 | `?p=1..5` |
+| Maritime Bell | 109 | раздел Master на балкерах; почти все объявления старые — отсекаются `max_age_days` |
+| Martide | 90 | `/jobs/master` и др. |
+| SeaJobs.pro | 61 | `/jobs/rank/master/bulk-carrier`, `/jobs/vessel/bulk-carrier` |
+| Crewell | 60 | `?page=1..5` |
+| SeaJobs.ru | 50 | `?page=1..5` |
+| SeaCareer | 21 | `/master-sdpo-jobs/`, `/deck-officer-jobs/` |
+| Sea-Man.org, ProSeafarers, Berge Bulk, Oldendorff, TURTLE, Columbia | 1–6 | |
+| OSM Thome | 0 | ссылки не находятся с серверов GitHub (вероятно, JS) |
+| JobMarineMan | 0 | блокирует IP GitHub Actions целиком (403 даже на странице входа) |
+| Maritime-Zone, FindSeafarer | выкл. | 403 на всё / нет раздела вакансий |
 
 В логе каждого запуска (Actions → шаг *Run job agent*) перечислена каждая
 вакансия капитана с причиной решения фильтра: `ДА`, `НЕТ: зарплата …`,
-`НЕТ: судно …`.
+`НЕТ: судно …`, `НЕТ: объявлению N дн.`
 
 ## Как это устроено
 

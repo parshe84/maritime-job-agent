@@ -55,6 +55,11 @@ def _fetch_with_login(config: dict) -> list[Vacancy]:
             ).new_page()
             resp = page.goto(LOGIN_URL, wait_until="domcontentloaded", timeout=timeout_ms)
             logger.info("[%s] страница входа: HTTP %s", SOURCE, resp.status if resp else "?")
+            if resp is not None and resp.status in (403, 429, 503):
+                # Сайт блокирует IP-адреса GitHub Actions целиком (проверено
+                # 2026-11-03) — до формы входа не дойти, логин не поможет.
+                logger.warning("[%s] сайт блокирует серверы GitHub (HTTP %s) — источник недоступен", SOURCE, resp.status)
+                return []
             page.wait_for_timeout(3000)
             page.locator("input[type=email], input[name*=mail i], input[name*=login i]").first.fill(login)
             page.locator("input[type=password]").first.fill(password)
