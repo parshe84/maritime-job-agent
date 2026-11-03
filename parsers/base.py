@@ -164,7 +164,10 @@ def parse_salary_usd(text: str) -> float | None:
     for pattern in _SALARY_PATTERNS:
         for match in pattern.finditer(text):
             raw = match.group(1)
-            cleaned = raw.replace(" ", "").replace(",", "")
+            cleaned = raw.strip().replace(" ", "").replace(",", "").rstrip(".")
+            # "10.000" — точка как разделитель тысяч (часто в Telegram), не дробь
+            if re.fullmatch(r"\d{1,3}(\.\d{3})+", cleaned):
+                cleaned = cleaned.replace(".", "")
             # Отсекаем то, что похоже на дату/телефон, а не деньги
             try:
                 value = float(cleaned)
@@ -202,6 +205,24 @@ def matches_any(text: str, keywords: list[str]) -> bool:
     return False
 
 
+def _phrase_regex(phrase: str) -> str:
+    """'помощник* капитан*' -> regex: слова через пробелы, '*' = любое окончание."""
+    parts = []
+    for w in phrase.lower().split():
+        parts.append(re.escape(w[:-1]) + r"\w*" if w.endswith("*") else re.escape(w) + r"\b")
+    return r"\b" + r"\s+".join(parts)
+
+
+def position_matches(text: str, filters: dict) -> bool:
+    """Должность подходит: есть слово из filters.positions ПОСЛЕ удаления
+    фраз-исключений (filters.position_exclude), например "старший помощник
+    капитана" — это не капитан, хотя слово "капитана" в тексте есть."""
+    cleaned = (text or "").lower()
+    for phrase in filters.get("position_exclude") or []:
+        cleaned = re.sub(_phrase_regex(phrase), " ", cleaned)
+    return matches_any(cleaned, filters.get("positions", []))
+
+
 def extract_dwt(text: str) -> int | None:
     """Пытается найти дедвейт судна в тексте, например '180,000 DWT' -> 180000."""
     if not text:
@@ -210,10 +231,12 @@ def extract_dwt(text: str) -> int | None:
     match = re.search(r"([\d][\d,\.\s]{3,10})\s*(?:dwt|двт|тдв)", text, re.IGNORECASE)
     # ...или "DWT 55875", "DWT: 55 875" — после
     if not match:
-        match = re.search(r"(?:dwt|двт|тдв)\s*[:\-]?\s*([\d][\d,\.\s]{3,10})", text, re.IGNORECASE)
+        match = re.search(r"(?:dwt|двт|тдв)\s*[:\-–—=]?\s*([\d][\d,\.\s]{3,10})", text, re.IGNORECASE)
     if not match:
         return None
-    cleaned = match.group(1).replace(" ", "").replace(",", "")
+    cleaned = match.group(1).strip().replace(" ", "").replace(",", "").rstrip(".")
+    if re.fullmatch(r"\d{1,3}(\.\d{3})+", cleaned):
+        cleaned = cleaned.replace(".", "")
     try:
         return int(float(cleaned))
     except ValueError:

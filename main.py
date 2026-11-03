@@ -21,7 +21,7 @@ from pathlib import Path
 import yaml
 
 import parsers as parsers_pkg
-from parsers.base import Vacancy, evaluate_vessel, matches_any, parse_salary_usd, polite_sleep
+from parsers.base import Vacancy, evaluate_vessel, matches_any, parse_salary_usd, polite_sleep, position_matches
 from mailer import send_digest, MailerConfigError
 
 ROOT_DIR = Path(__file__).resolve().parent
@@ -103,7 +103,7 @@ def matches_filters(vacancy: Vacancy, config: dict) -> bool:
     filters = config.get("filters", {})
     haystack = " ".join([vacancy.title, vacancy.vessel_type, vacancy.raw_text])
 
-    if not matches_any(haystack, filters.get("positions", [])):
+    if not position_matches(haystack, filters):
         return False
 
     vessel_matched, vessel_class_unknown = evaluate_vessel(haystack, filters)
@@ -149,10 +149,10 @@ def rejection_reason(vacancy: Vacancy, config: dict) -> str:
 
 def log_candidates(vacancies: list[Vacancy], config: dict) -> None:
     """Логирует каждую вакансию капитана/мастера с причиной решения фильтра."""
-    positions = config.get("filters", {}).get("positions", [])
+    filters = config.get("filters", {})
     candidates = [
         v for v in vacancies
-        if matches_any(" ".join([v.title, v.raw_text]), positions)
+        if position_matches(" ".join([v.title, v.raw_text]), filters)
     ]
     logger.info("--- Кандидаты по должности (%d шт.) ---", len(candidates))
     for v in candidates:

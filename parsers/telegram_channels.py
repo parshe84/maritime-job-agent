@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import logging
 import re
+from datetime import datetime, timedelta, timezone
 
 from bs4 import BeautifulSoup
 
@@ -25,7 +26,7 @@ SOURCE = "telegram"
 PAGES_PER_CHANNEL = 2  # ~20 постов на странице; запуск каждый час — с запасом
 
 
-def _parse_page(channel: str, html: str) -> tuple[list[Vacancy], int | None]:
+def _parse_page(channel: str, html: str, max_age_days: int = 10) -> tuple[list[Vacancy], int | None]:
     soup = BeautifulSoup(html, "html.parser")
     vacancies: list[Vacancy] = []
     min_id: int | None = None
@@ -48,6 +49,13 @@ def _parse_page(channel: str, html: str) -> tuple[list[Vacancy], int | None]:
             lines[0] if lines else text[:80],
         )
         posted = msg.select_one("time[datetime]")
+        if posted and max_age_days:
+            try:
+                when = datetime.fromisoformat(posted["datetime"])
+                if datetime.now(timezone.utc) - when > timedelta(days=max_age_days):
+                    continue  # старый пост: вакансия, скорее всего, уже закрыта
+            except ValueError:
+                pass
         vacancies.append(
             Vacancy(
                 source=f"telegram:{channel}",
@@ -69,7 +77,9 @@ def fetch_vacancies(config: dict) -> list[Vacancy]:
         got = 0
         try:
             for _ in range(PAGES_PER_CHANNEL):
-                vacancies, min_id = _parse_page(channel, fetch_html(url, config))
+                vacancies, min_id = _parse_page(
+                    channel, fetch_html(url, config), config.get("telegram_max_age_days", 10)
+                )
                 result.extend(vacancies)
                 got += len(vacancies)
                 if not min_id:
